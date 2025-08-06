@@ -12,6 +12,7 @@
         "special_defense": 3,
         "attack_speed": 45,
         "crit_rate": 0.1,
+        "evasion": 0.03,      -- 闪避率（3%）
         "ultimate_value": 0
       },
       "passive_skills": ["fixed_defense"]
@@ -21,7 +22,8 @@
     "hp_per_level": 8,
     "attack_per_level": 2,
     "defense_per_level": 1,
-    "speed_per_level": 2
+    "speed_per_level": 2,
+    "evasion_per_level": 0.001
   },
   "boss_abilities": [
     {
