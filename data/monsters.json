@@ -1,0 +1,53 @@
+{
+  "base_monsters": [
+    {
+      "id": "goblin", 
+      "name": "哥布林",
+      "image": "assets/pixel_sprites/goblin.png",
+      "base_stats": {
+        "hp": 50,
+        "attack": 12,
+        "defense": 5,
+        "special_attack": 8,
+        "special_defense": 3,
+        "attack_speed": 45,
+        "crit_rate": 0.1,
+        "ultimate_value": 0
+      },
+      "passive_skills": ["fixed_defense"]
+    }
+  ],
+  "scaling": {
+    "hp_per_level": 8,
+    "attack_per_level": 2,
+    "defense_per_level": 1,
+    "speed_per_level": 2
+  },
+  "boss_abilities": [
+    {
+      "world": 1,
+      "ability": "double_attack",
+      "description": "每回合攻击两次"
+    },
+    {
+      "world": 2,
+      "ability": "regeneration",
+      "description": "每回合回复10%生命值"
+    },
+    {
+      "world": 3,
+      "ability": "double_attack",
+      "description": "每回合攻击两次"
+    },
+    {
+      "world": 4,
+      "ability": "regeneration",
+      "description": "每回合回复10%生命值"
+    },
+    {
+      "world": 5,
+      "ability": "double_attack",
+      "description": "最终BOSS每回合攻击两次"
+    }
+  ]
+}

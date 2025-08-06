@@ -1,0 +1,54 @@
+{
+  "skills": [
+    {
+      "id": "fixed_attack",
+      "name": "固定攻击强化",
+      "description": "永久增加10点攻击力",
+      "type": "permanent_stat",
+      "effects": {
+        "attack": 10
+      },
+      "stackable": true
+    },
+    {
+      "id": "fixed_defense",
+      "name": "固定防御强化",
+      "description": "永久增加5点防御力",
+      "type": "permanent_stat",
+      "effects": {
+        "defense": 5
+      },
+      "stackable": true
+    },
+    {
+      "id": "victory_attack",
+      "name": "胜利攻击叠加",
+      "description": "每次胜利增加2点攻击力",
+      "type": "victory_bonus",
+      "effects": {
+        "attack_per_victory": 2
+      },
+      "stackable": true
+    },
+    {
+      "id": "victory_speed",
+      "name": "胜利速度叠加",
+      "description": "每次胜利增加5点攻击速度",
+      "type": "victory_bonus",
+      "effects": {
+        "speed_per_victory": 5
+      },
+      "stackable": true
+    },
+    {
+      "id": "victory_heal",
+      "name": "胜利治疗",
+      "description": "胜利后恢复20%最大生命值",
+      "type": "victory_bonus",
+      "effects": {
+        "heal_percent": 0.2
+      },
+      "stackable": false
+    }
+  ]
+}
