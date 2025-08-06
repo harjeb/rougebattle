@@ -4,7 +4,9 @@
       "Bash(mkdir:*)",
       "Bash(find:*)",
       "Bash(ls:*)",
-      "Bash(love:*)"
+      "Bash(love:*)",
+      "Bash(lua:*)",
+      "Bash(python:*)"
     ],
     "deny": []
   }

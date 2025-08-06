@@ -16,7 +16,6 @@ local player_attack_timer = 0
 local monster_attack_timer = 0
 local player_attack_interval = 1.0
 local monster_attack_interval = 1.0
-local waiting_for_animation = false
 
 function Combat.load(data)
     player = SaveSystem.getPlayer()
@@ -33,8 +32,9 @@ function Combat.load(data)
     player_attack_timer = 0
     monster_attack_timer = 0
     combat_phase = "fighting"
-    waiting_for_animation = false
     AnimationSystem.clear()
+    pending_attacks = {}
+    last_attack_timestamp = 0
     
     table.insert(combat_log, "战斗开始！")
     table.insert(combat_log, string.format("玩家速度:%d (%.3f秒/次)", player.stats.attack_speed, player_attack_interval))
@@ -45,29 +45,29 @@ function Combat.update(dt)
     combat_timer = combat_timer + dt
     AnimationSystem.update(dt)
     
-    if combat_phase == "fighting" and not waiting_for_animation then
-        -- 更新玩家攻击计时器
+    -- Process collision detection for concurrent attacks
+    AnimationSystem.checkAttackCollision()
+    
+    -- Process completed attacks
+    Combat.processCompletedAttacks()
+    
+    if combat_phase == "fighting" then
+        -- 玩家攻击计时（不受动画影响）
         player_attack_timer = player_attack_timer + dt
         if player_attack_timer >= player_attack_interval and player.stats.hp > 0 and monster.hp > 0 then
-            Combat.executePlayerAttack()
+            Combat.queuePlayerAttack()
             player_attack_timer = 0
         end
         
-        -- 更新怪物攻击计时器
+        -- 怪物攻击计时（不受动画影响）
         monster_attack_timer = monster_attack_timer + dt
         if monster_attack_timer >= monster_attack_interval and monster.hp > 0 and player.stats.hp > 0 then
-            Combat.executeMonsterAttack()
+            Combat.queueMonsterAttack()
             monster_attack_timer = 0
         end
         
-        -- 检查胜负
-        if monster.hp <= 0 and combat_phase == "fighting" then
-            combat_phase = "victory"
-            combat_timer = 0
-        elseif player.stats.hp <= 0 and combat_phase == "fighting" then
-            combat_phase = "defeat" 
-            combat_timer = 0
-        end
+        -- 检查胜负（基于当前血量）
+        Combat.checkCombatEnd()
         
     elseif combat_phase == "victory" and combat_timer > 2.0 then
         Combat.handleVictory()
@@ -77,9 +77,73 @@ function Combat.update(dt)
     end
 end
 
-function Combat.executePlayerAttack()
-    -- Calculate damage first
-    local damage, is_crit
+-- Real-time combat functions (replaced old execute functions)
+function Combat.queuePlayerAttack()
+    local damage, is_crit, is_ultimate = Combat.calculatePlayerDamage()
+    local timestamp = love.timer.getTime()
+    local bullet_id = AnimationSystem.generateBulletId()
+    
+    -- Create attack data
+    local attack = {
+        attacker = "player",
+        damage = damage,
+        is_critical = is_crit,
+        is_ultimate = is_ultimate,
+        timestamp = timestamp,
+        bullet_id = bullet_id
+    }
+    
+    -- Create animation
+    AnimationSystem.createBulletAnimation(
+        200, 200,  -- Player position
+        600, 200,  -- Monster position
+        0.3,       -- Duration
+        {1, 1, 0.2, 1},  -- Yellow bullet
+        "player",
+        timestamp,
+        function()
+            Combat.applyAttackDamage(attack)
+        end
+    )
+    
+    -- Store in pending attacks
+    pending_attacks[bullet_id] = attack
+end
+
+function Combat.queueMonsterAttack()
+    local damage, is_crit, is_ultimate = Combat.calculateMonsterDamage()
+    local timestamp = love.timer.getTime()
+    local bullet_id = AnimationSystem.generateBulletId()
+    
+    -- Create attack data
+    local attack = {
+        attacker = "monster",
+        damage = damage,
+        is_critical = is_crit,
+        is_ultimate = is_ultimate,
+        timestamp = timestamp,
+        bullet_id = bullet_id
+    }
+    
+    -- Create animation
+    AnimationSystem.createBulletAnimation(
+        600, 200,  -- Monster position
+        200, 200,  -- Player position
+        0.3,       -- Duration
+        {1, 0.2, 0.2, 1},  -- Red bullet
+        "monster",
+        timestamp,
+        function()
+            Combat.applyAttackDamage(attack)
+        end
+    )
+    
+    -- Store in pending attacks
+    pending_attacks[bullet_id] = attack
+end
+
+function Combat.calculatePlayerDamage()
+    local damage, is_crit = 0, false
     local is_ultimate = false
     
     if CombatEngine.incrementUltimate(player.stats) then
@@ -90,48 +154,20 @@ function Combat.executePlayerAttack()
         damage, is_crit = CombatEngine.calculateDamage(player.stats, monster)
     end
     
-    -- Create animation from player position to monster position
-    waiting_for_animation = true
-    AnimationSystem.createBulletAnimation(
-        200, 200, -- Player position (approximate)
-        600, 200, -- Monster position (approximate)
-        0.3, -- Duration
-        function()
-            -- Apply damage when animation completes
-            monster.hp = monster.hp - damage
-            if monster.hp <= 0 then
-                monster.hp = 0
-            end
-            
-            -- Add combat log message
-            if is_ultimate then
-                table.insert(combat_log, "玩家发动奥义！造成 " .. damage .. " 点伤害！")
-            else
-                table.insert(combat_log, "玩家攻击造成 " .. damage .. (is_crit and " 点伤害！(暴击！)" or " 点伤害"))
-            end
-            
-            waiting_for_animation = false
-        end
-    )
+    return damage, is_crit, is_ultimate
 end
 
-function Combat.executeMonsterAttack()
-    -- BOSS回血能力（每次攻击时检查）
+function Combat.calculateMonsterDamage()
+    local damage, is_crit = 0, false
+    local is_ultimate = false
+    
+    -- Handle BOSS healing ability during attack timing
     if monster.boss_ability == "regeneration" then
         local healed = MonsterSystem.applyBossAbility(monster, player.stats)
         if healed > 0 then
             table.insert(combat_log, "BOSS回复了 " .. healed .. " 点生命值！")
         end
     end
-    
-    -- BOSS双倍攻击能力：攻击间隔减半
-    if monster.boss_ability == "double_attack" then
-        -- 双倍攻击已经通过攻击间隔减半实现
-    end
-    
-    -- Calculate damage first
-    local damage, is_crit
-    local is_ultimate = false
     
     if CombatEngine.incrementUltimate(monster) then
         damage = CombatEngine.calculateUltimateDamage(monster, player.stats)
@@ -141,34 +177,62 @@ function Combat.executeMonsterAttack()
         damage, is_crit = CombatEngine.calculateDamage(monster, player.stats)
     end
     
-    -- Create animation from monster position to player position
-    waiting_for_animation = true
-    AnimationSystem.createBulletAnimation(
-        600, 200, -- Monster position (approximate)
-        200, 200, -- Player position (approximate)
-        0.3, -- Duration
-        function()
-            -- Apply damage when animation completes
-            player.stats.hp = player.stats.hp - damage
-            if player.stats.hp <= 0 then
-                player.stats.hp = 0
-            end
-            
-            -- Add combat log message
-            if is_ultimate then
-                table.insert(combat_log, "怪物发动奥义！造成 " .. damage .. " 点伤害！")
-            else
-                table.insert(combat_log, "怪物攻击造成 " .. damage .. (is_crit and " 点伤害！(暴击！)" or " 点伤害"))
-            end
-            
-            waiting_for_animation = false
+    return damage, is_crit, is_ultimate
+end
+
+function Combat.applyAttackDamage(attack)
+    -- Remove from pending attacks
+    pending_attacks[attack.bullet_id] = nil
+    
+    -- Apply damage based on attacker type
+    if attack.attacker == "player" then
+        monster.hp = monster.hp - attack.damage
+        if monster.hp <= 0 then
+            monster.hp = 0
         end
-    )
+        
+        -- Add combat log
+        if attack.is_ultimate then
+            table.insert(combat_log, "玩家发动奥义！造成 " .. attack.damage .. " 点伤害！")
+        else
+            table.insert(combat_log, "玩家攻击造成 " .. attack.damage .. (attack.is_critical and " 点伤害！(暴击！)" or " 点伤害"))
+        end
+    else
+        player.stats.hp = player.stats.hp - attack.damage
+        if player.stats.hp <= 0 then
+            player.stats.hp = 0
+        end
+        
+        -- Add combat log
+        if attack.is_ultimate then
+            table.insert(combat_log, "怪物发动奥义！造成 " .. attack.damage .. " 点伤害！")
+        else
+            table.insert(combat_log, "怪物攻击造成 " .. attack.damage .. (attack.is_critical and " 点伤害！(暴击！)" or " 点伤害"))
+        end
+    end
+end
+
+function Combat.processCompletedAttacks()
+    -- Animation callbacks handle damage application automatically
+    -- This function reserved for future batch processing if needed
+end
+
+function Combat.checkCombatEnd()
+    if monster.hp <= 0 and combat_phase == "fighting" then
+        combat_phase = "victory"
+        combat_timer = 0
+    elseif player.stats.hp <= 0 and combat_phase == "fighting" then
+        combat_phase = "defeat"
+        combat_timer = 0
+    end
 end
 
 function Combat.handleVictory()
     player.victory_count = player.victory_count + 1
     SkillSystem.applyVictoryBonuses(player)
+    
+    -- 重置奥义值
+    player.stats.ultimate_value = 0
     
     player.current_level = player.current_level + 1
     if player.current_level > 50 then
@@ -190,6 +254,8 @@ function Combat.handleDefeat()
     -- 失败后重置到当前世界第一关
     player.current_level = 1
     player.stats.hp = player.stats.max_hp
+    -- 重置奥义值
+    player.stats.ultimate_value = 0
     SaveSystem.save()
     local GameState = require("systems.game_state")
     GameState.switch("game_over", {victory = false})
