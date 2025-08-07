@@ -23,10 +23,16 @@ function Combat.load(data)
     combat_log = {}
     table.insert(combat_log, "第 " .. player.current_world .. " 世界 - 第 " .. player.current_level .. " 关")
     
-    -- 计算攻击间隔：使用新的速度公式
-    -- 速度50 = 1.0秒间隔, 速度1000 = 0.03秒间隔
-    player_attack_interval = CombatEngine.speedToInterval(player.stats.attack_speed)
-    monster_attack_interval = CombatEngine.speedToInterval(monster.attack_speed)
+    -- Initialize active_debuffs for monster if not present
+    if not monster.active_debuffs then
+        monster.active_debuffs = {}
+    end
+    
+    -- 计算攻击间隔：使用新的速度公式和技能效果
+    local effective_player_speed = CombatEngine.calculateEffectiveSpeed(player.stats)
+    local effective_monster_speed = CombatEngine.calculateEffectiveSpeed(monster)
+    player_attack_interval = CombatEngine.speedToInterval(effective_player_speed)
+    monster_attack_interval = CombatEngine.speedToInterval(effective_monster_speed)
     
     combat_timer = 0
     player_attack_timer = 0
@@ -37,8 +43,8 @@ function Combat.load(data)
     last_attack_timestamp = 0
     
     table.insert(combat_log, "战斗开始！")
-    table.insert(combat_log, string.format("玩家速度:%d (%.3f秒/次)", player.stats.attack_speed, player_attack_interval))
-    table.insert(combat_log, string.format("怪物速度:%d (%.3f秒/次)", monster.attack_speed, monster_attack_interval))
+    table.insert(combat_log, string.format("玩家速度:%d (%.3f秒/次)", effective_player_speed, player_attack_interval))
+    table.insert(combat_log, string.format("怪物速度:%d (%.3f秒/次)", effective_monster_speed, monster_attack_interval))
 end
 
 function Combat.update(dt)
@@ -52,6 +58,17 @@ function Combat.update(dt)
     Combat.processCompletedAttacks()
     
     if combat_phase == "fighting" then
+        -- Update skill effect timers for both player and monster
+        local SkillSystem = require("systems.skill_system")
+        SkillSystem.updateActiveEffects(player.stats, dt)
+        SkillSystem.updateActiveEffects(monster, dt)
+        
+        -- Recalculate attack intervals with conditional effects and debuffs
+        local effective_player_speed = CombatEngine.calculateEffectiveSpeed(player.stats)
+        local effective_monster_speed = CombatEngine.calculateEffectiveSpeed(monster)
+        player_attack_interval = CombatEngine.speedToInterval(effective_player_speed)
+        monster_attack_interval = CombatEngine.speedToInterval(effective_monster_speed)
+        
         -- 玩家攻击计时（不受动画影响）
         player_attack_timer = player_attack_timer + dt
         if player_attack_timer >= player_attack_interval and player.stats.hp > 0 and monster.hp > 0 then
@@ -79,7 +96,7 @@ end
 
 -- Real-time combat functions (replaced old execute functions)
 function Combat.queuePlayerAttack()
-    local damage, is_crit, is_ultimate = Combat.calculatePlayerDamage()
+    local damage, is_crit, is_ultimate, is_dodged = Combat.calculatePlayerDamage()
     local timestamp = love.timer.getTime()
     local bullet_id = AnimationSystem.generateBulletId()
     
@@ -89,6 +106,7 @@ function Combat.queuePlayerAttack()
         damage = damage,
         is_critical = is_crit,
         is_ultimate = is_ultimate,
+        is_dodged = is_dodged,
         timestamp = timestamp,
         bullet_id = bullet_id
     }
@@ -111,7 +129,7 @@ function Combat.queuePlayerAttack()
 end
 
 function Combat.queueMonsterAttack()
-    local damage, is_crit, is_ultimate = Combat.calculateMonsterDamage()
+    local damage, is_crit, is_ultimate, is_dodged = Combat.calculateMonsterDamage()
     local timestamp = love.timer.getTime()
     local bullet_id = AnimationSystem.generateBulletId()
     
@@ -121,6 +139,7 @@ function Combat.queueMonsterAttack()
         damage = damage,
         is_critical = is_crit,
         is_ultimate = is_ultimate,
+        is_dodged = is_dodged,
         timestamp = timestamp,
         bullet_id = bullet_id
     }
@@ -143,7 +162,7 @@ function Combat.queueMonsterAttack()
 end
 
 function Combat.calculatePlayerDamage()
-    local damage, is_crit = 0, false
+    local damage, is_crit, is_dodged = 0, false, false
     local is_ultimate = false
     
     if CombatEngine.incrementUltimate(player.stats) then
@@ -151,14 +170,14 @@ function Combat.calculatePlayerDamage()
         is_ultimate = true
         CombatEngine.resetUltimate(player.stats)
     else
-        damage, is_crit = CombatEngine.calculateDamage(player.stats, monster)
+        damage, is_crit, is_dodged = CombatEngine.calculateDamage(player.stats, monster)
     end
     
-    return damage, is_crit, is_ultimate
+    return damage, is_crit, is_ultimate, is_dodged
 end
 
 function Combat.calculateMonsterDamage()
-    local damage, is_crit = 0, false
+    local damage, is_crit, is_dodged = 0, false, false
     local is_ultimate = false
     
     -- Handle BOSS healing ability during attack timing
@@ -174,21 +193,37 @@ function Combat.calculateMonsterDamage()
         is_ultimate = true
         CombatEngine.resetUltimate(monster)
     else
-        damage, is_crit = CombatEngine.calculateDamage(monster, player.stats)
+        damage, is_crit, is_dodged = CombatEngine.calculateDamage(monster, player.stats)
     end
     
-    return damage, is_crit, is_ultimate
+    return damage, is_crit, is_ultimate, is_dodged
 end
 
 function Combat.applyAttackDamage(attack)
     -- Remove from pending attacks
     pending_attacks[attack.bullet_id] = nil
     
+    -- 处理闪避
+    if attack.is_dodged then
+        if attack.attacker == "player" then
+            table.insert(combat_log, "怪物闪避了玩家的攻击！")
+        else
+            table.insert(combat_log, "玩家闪避了怪物的攻击！")
+        end
+        return  -- 闪避后不再造成伤害
+    end
+    
     -- Apply damage based on attacker type
     if attack.attacker == "player" then
         monster.hp = monster.hp - attack.damage
         if monster.hp <= 0 then
             monster.hp = 0
+        end
+        
+        -- Apply attack consequences (reflection, debuffs)
+        local reflect_damage = CombatEngine.applyAttackConsequences(player.stats, monster, attack.damage)
+        if reflect_damage > 0 then
+            table.insert(combat_log, "玩家受到 " .. reflect_damage .. " 点反伤！")
         end
         
         -- Add combat log
@@ -201,6 +236,12 @@ function Combat.applyAttackDamage(attack)
         player.stats.hp = player.stats.hp - attack.damage
         if player.stats.hp <= 0 then
             player.stats.hp = 0
+        end
+        
+        -- Apply attack consequences (reflection, debuffs)
+        local reflect_damage = CombatEngine.applyAttackConsequences(monster, player.stats, attack.damage)
+        if reflect_damage > 0 then
+            table.insert(combat_log, "怪物受到 " .. reflect_damage .. " 点反伤！")
         end
         
         -- Add combat log

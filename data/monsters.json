@@ -12,7 +12,7 @@
         "special_defense": 3,
         "attack_speed": 45,
         "crit_rate": 0.1,
-        "evasion": 0.03,      -- 闪避率（3%）
+        "evasion": 0.03,
         "ultimate_value": 0
       },
       "passive_skills": ["fixed_defense"]

@@ -34,6 +34,7 @@ function MonsterSystem.generateMonster(world, level)
         special_defense = base_monster.base_stats.special_defense + (scaling.defense_per_level * total_level),
         attack_speed = base_monster.base_stats.attack_speed + (scaling.speed_per_level * total_level),
         crit_rate = base_monster.base_stats.crit_rate,
+        evasion = base_monster.base_stats.evasion + (scaling.evasion_per_level or 0 * total_level),
         ultimate_value = 0,
         is_boss = (level == 50),
         boss_ability = nil

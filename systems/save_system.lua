@@ -17,6 +17,29 @@ function SaveSystem.load()
             -- 旧的速度系统，需要升级
             player_data.stats.attack_speed = 50  -- 重置为新系统的默认值
         end
+        
+        -- 升级旧存档添加新的技能系统字段 - using standardized field names
+        if not player_data.stats.evasion then
+            player_data.stats.evasion = 0.05  -- Default 5% evasion
+        end
+        if not player_data.stats.crit_rate then
+            player_data.stats.crit_rate = 0.05  -- Default 5% crit rate
+        end
+        
+        -- Migrate old field names to standardized ones
+        if player_data.stats.dodge_chance then
+            player_data.stats.evasion = (player_data.stats.evasion or 0) + player_data.stats.dodge_chance
+            player_data.stats.dodge_chance = nil  -- Remove old field
+        end
+        if player_data.stats.crit_chance then
+            player_data.stats.crit_rate = (player_data.stats.crit_rate or 0) + player_data.stats.crit_chance
+            player_data.stats.crit_chance = nil  -- Remove old field
+        end
+        if not player_data.active_effects then
+            player_data.active_effects = {
+                debuffs_applied_to_enemy = {}
+            }
+        end
     else
         SaveSystem.createNewGame()
     end
@@ -35,10 +58,15 @@ function SaveSystem.createNewGame()
             special_defense = 8,
             attack_speed = 50,  -- 50速度 = 1.0秒间隔
             crit_rate = 0.05,
-            ultimate_value = 0
+            evasion = 0.05,     -- 闪避率（5%）
+            ultimate_value = 0,
+            -- Note: evasion and crit_rate are already defined above with proper defaults
         },
         skills = {},
-        victory_count = 0
+        victory_count = 0,
+        active_effects = {
+            debuffs_applied_to_enemy = {}
+        }
     }
 end
 

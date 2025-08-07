@@ -40,10 +40,32 @@ function SkillSelection.draw()
     for i, skill in ipairs(skills) do
         local x = 100 + (i - 1) * 220
         
+        -- Draw card background
         love.graphics.setColor(0, 0, 0, 1)
         love.graphics.rectangle("fill", x, card_y, card_width, card_height)
+        
+        -- Determine border color and style based on stackability
+        local border_color = {1, 1, 1, 1}  -- White for stackable
+        local is_stackable = skill.stackable
+        
+        if not is_stackable then
+            border_color = {1, 1, 0, 1}  -- Yellow for non-stackable
+        end
+        
+        love.graphics.setColor(border_color)
+        love.graphics.setLineWidth(2)
+        
+        -- Draw border (solid for stackable, dashed for non-stackable)
+        if is_stackable then
+            love.graphics.rectangle("line", x, card_y, card_width, card_height)
+        else
+            -- Draw dashed border for non-stackable skills
+            SkillSelection.drawDashedRectangle(x, card_y, card_width, card_height)
+        end
+        
+        -- Reset line width
+        love.graphics.setLineWidth(1)
         love.graphics.setColor(1, 1, 1, 1)
-        love.graphics.rectangle("line", x, card_y, card_width, card_height)
         
         love.graphics.printf("[" .. i .. "] " .. skill.name, x + 10, card_y + 20, card_width - 20, "center")
         love.graphics.printf(skill.description, x + 10, card_y + 80, card_width - 20, "center")
@@ -95,6 +117,36 @@ function SkillSelection.keypressed(key)
         if skills[skill_index] then
             selected_skill = skills[skill_index]
         end
+    end
+end
+
+function SkillSelection.drawDashedRectangle(x, y, width, height)
+    local dash_length = 8
+    local gap_length = 4
+    local total_pattern = dash_length + gap_length
+    
+    -- Draw top edge
+    for i = 0, width, total_pattern do
+        local segment_width = math.min(dash_length, width - i)
+        love.graphics.rectangle("fill", x + i, y, segment_width, 2)
+    end
+    
+    -- Draw bottom edge
+    for i = 0, width, total_pattern do
+        local segment_width = math.min(dash_length, width - i)
+        love.graphics.rectangle("fill", x + i, y + height - 2, segment_width, 2)
+    end
+    
+    -- Draw left edge
+    for i = 0, height, total_pattern do
+        local segment_height = math.min(dash_length, height - i)
+        love.graphics.rectangle("fill", x, y + i, 2, segment_height)
+    end
+    
+    -- Draw right edge
+    for i = 0, height, total_pattern do
+        local segment_height = math.min(dash_length, height - i)
+        love.graphics.rectangle("fill", x + width - 2, y + i, 2, segment_height)
     end
 end
 

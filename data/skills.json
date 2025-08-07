@@ -44,11 +44,115 @@
       "id": "fixed_hp",
       "name": "强壮I",
       "description": "增加80最大生命值",
-      "type": permanent_stat
+      "type": "permanent_stat",
       "effects": {
         "hp": 80
       },
       "stackable": false
+    },
+    {
+      "id": "dodge_stance_1",
+      "name": "闪避姿态I",
+      "description": "每次胜利增加0.5%闪避概率",
+      "type": "victory_bonus",
+      "effects": {
+        "dodge_chance_per_victory": 0.005
+      },
+      "stackable": true
+    },
+    {
+      "id": "crit_stance_1",
+      "name": "暴击姿态I",
+      "description": "每次胜利增加1%暴击率",
+      "type": "victory_bonus",
+      "effects": {
+        "crit_chance_per_victory": 0.01
+      },
+      "stackable": true
+    },
+    {
+      "id": "poison_blade",
+      "name": "淬毒",
+      "description": "每次攻击附带特殊攻击力的20%",
+      "type": "on_hit",
+      "effects": {
+        "poison_damage_percent": 0.20
+      },
+      "stackable": false
+    },
+    {
+      "id": "reflect_blade",
+      "name": "反伤之刺",
+      "description": "每次受到攻击对敌方造成2点伤害",
+      "type": "on_hit_received",
+      "effects": {
+        "reflect_damage": 2
+      },
+      "stackable": true
+    },
+    {
+      "id": "brave",
+      "name": "勇猛",
+      "description": "HP在70%以上时攻击速度增加50",
+      "type": "conditional",
+      "effects": {
+        "attack_speed_bonus": 50,
+        "hp_threshold_min": 0.7
+      },
+      "stackable": true
+    },
+    {
+      "id": "desperate",
+      "name": "背水",
+      "description": "HP在30%以下时攻击速度增加100",
+      "type": "conditional",
+      "effects": {
+        "attack_speed_bonus": 100,
+        "hp_threshold_max": 0.3
+      },
+      "stackable": true
+    },
+    {
+      "id": "healing_blade",
+      "name": "恢复之刃",
+      "description": "每次攻击回复1点HP",
+      "type": "on_hit",
+      "effects": {
+        "heal_per_hit": 1
+      },
+      "stackable": true
+    },
+    {
+      "id": "whirlwind",
+      "name": "漩涡",
+      "description": "攻击时有25%概率额外造成50%特殊攻击力伤害",
+      "type": "chance_effect",
+      "effects": {
+        "trigger_chance": 0.25,
+        "bonus_damage_percent": 0.5
+      },
+      "stackable": false
+    },
+    {
+      "id": "lifesteal",
+      "name": "吸血",
+      "description": "每次攻击回复自身5%造成伤害的HP",
+      "type": "on_hit",
+      "effects": {
+        "lifesteal_percent": 0.05
+      },
+      "stackable": true
+    },
+    {
+      "id": "frost_blade",
+      "name": "冰霜之刃",
+      "description": "每次攻击会造成敌方速度降低5，持续1秒",
+      "type": "debuff",
+      "effects": {
+        "speed_reduction": 5,
+        "duration": 1.0
+      },
+      "stackable": true
     }
   ]
 }
